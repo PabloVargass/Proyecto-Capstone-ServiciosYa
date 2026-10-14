@@ -1,0 +1,184 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ProveedorAutenticacion {
+  LOCAL
+  GOOGLE
+}
+
+model Usuario {
+  id         String                 @id @default(uuid())
+  nombre     String
+  rut        String                 @unique
+  correo     String                 @unique
+  telefono   String?
+  contrasena String?
+  proveedor  ProveedorAutenticacion @default(LOCAL)
+  googleId   String?                @unique
+
+  correoVerificadoEn DateTime?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  trabajos      Trabajo[]
+  postulaciones Postulacion[]
+
+  conversacionesComoPropietario Conversacion[] @relation("PropietarioConversacion")
+  conversacionesComoTrabajador  Conversacion[] @relation("TrabajadorConversacion")
+
+  mensajes Mensaje[]
+
+  resenasRealizadas Resena[] @relation("AutorResena")
+  resenasRecibidas  Resena[] @relation("ReceptorResena")
+
+  tokensRecuperacion       TokenRecuperacion[]
+  tokensVerificacionCorreo TokenVerificacionCorreo[]
+}
+
+enum EstadoTrabajo {
+  PUBLICADO
+  ASIGNADO
+  EN_PROCESO
+  COMPLETADO
+  CANCELADO
+}
+
+model Trabajo {
+  id           String        @id @default(uuid())
+  titulo       String
+  descripcion  String
+  categoria    String
+  comuna       String
+  presupuesto  Int
+  fechaTrabajo DateTime?
+  estado       EstadoTrabajo @default(PUBLICADO)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  propietarioId String
+  propietario   Usuario @relation(fields: [propietarioId], references: [id], onDelete: Cascade)
+
+  postulaciones Postulacion[]
+  conversacion  Conversacion?
+
+  resenas Resena[]
+}
+
+enum EstadoPostulacion {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  CANCELADA
+}
+
+model Postulacion {
+  id     String            @id @default(uuid())
+  estado EstadoPostulacion @default(PENDIENTE)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  usuarioId String
+  trabajoId String
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  trabajo Trabajo @relation(fields: [trabajoId], references: [id], onDelete: Cascade)
+
+  conversacion Conversacion?
+
+  @@unique([usuarioId, trabajoId])
+}
+
+model Conversacion {
+  id String @id @default(uuid())
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  trabajoId     String @unique
+  postulacionId String @unique
+
+  propietarioId String
+  trabajadorId  String
+
+  trabajo     Trabajo     @relation(fields: [trabajoId], references: [id], onDelete: Cascade)
+  postulacion Postulacion @relation(fields: [postulacionId], references: [id], onDelete: Cascade)
+
+  propietario Usuario @relation("PropietarioConversacion", fields: [propietarioId], references: [id], onDelete: Cascade)
+  trabajador  Usuario @relation("TrabajadorConversacion", fields: [trabajadorId], references: [id], onDelete: Cascade)
+
+  mensajes Mensaje[]
+}
+
+model Mensaje {
+  id String @id @default(uuid())
+
+  contenido String
+  leido     Boolean  @default(false)
+  creadoEn  DateTime @default(now())
+
+  conversacionId String
+  remitenteId    String
+
+  conversacion Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  remitente    Usuario      @relation(fields: [remitenteId], references: [id], onDelete: Cascade)
+}
+
+model Resena {
+  id String @id @default(uuid())
+
+  puntuacion Int
+  comentario String?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  trabajoId  String
+  autorId    String
+  receptorId String
+
+  trabajo  Trabajo @relation(fields: [trabajoId], references: [id], onDelete: Cascade)
+  autor    Usuario @relation("AutorResena", fields: [autorId], references: [id], onDelete: Cascade)
+  receptor Usuario @relation("ReceptorResena", fields: [receptorId], references: [id], onDelete: Cascade)
+
+  @@unique([trabajoId, autorId, receptorId])
+}
+
+model TokenRecuperacion {
+  id String @id @default(uuid())
+
+  tokenHash String    @unique
+  expiraEn  DateTime
+  usadoEn   DateTime?
+
+  creadoEn DateTime @default(now())
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+}
+
+model TokenVerificacionCorreo {
+  id String @id @default(uuid())
+
+  tokenHash String    @unique
+  expiraEn  DateTime
+  usadoEn   DateTime?
+
+  creadoEn DateTime @default(now())
+
+  usuarioId String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+}
